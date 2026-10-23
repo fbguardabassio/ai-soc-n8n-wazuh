@@ -1,0 +1,1061 @@
+{
+  "name": "AI SOC - Wazuh Cowrie Triage and Containment (Public Demo)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-soc-security-case-demo",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -352,
+        0
+      ],
+      "id": "56978dc3-65b8-453f-8647-aa6cd1c12ac2",
+      "name": "Receive Security Case"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "be99756e-dab5-4a8f-855b-4678b27a8dc9",
+              "leftValue": "={{ $('Receive Security Case').item.json.body.rule.level }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        96,
+        0
+      ],
+      "id": "59def547-16ae-4722-ac4f-266dd9257391",
+      "name": "Initial Risk Classification"
+    },
+    {
+      "parameters": {
+        "url": "https://api.abuseipdb.com/api/v2/check",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ipAddress",
+              "value": "={{ $json.source_ip }}"
+            },
+            {
+              "name": "maxAgeInDays",
+              "value": "90"
+            },
+            {
+              "name": "verbose",
+              "value": "true"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Key",
+              "value": "KEY_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        544,
+        -160
+      ],
+      "id": "1731a66c-e177-41af-849c-fdaeeaf8a6a7",
+      "name": "Threat Intelligence Enrichment",
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bfa80c2d-4a77-428f-9f70-ee5f7f4d4abd",
+              "name": "source_ip",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.source_ip || $json.ipAddress || $json.data?.ipAddress || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "359bbd75-361f-488d-8c3b-d7cb9053a003",
+              "name": "abuse_score",
+              "value": "={{ Number($json.data?.abuseConfidenceScore || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "8e9e0004-5973-46c9-9c17-554d11cd90dd",
+              "name": "country",
+              "value": "={{ $json.data?.countryCode || \"unknown\" }}",
+              "type": "string"
+            },
+            {
+              "id": "16e8db2d-4276-43aa-9310-74d195d96a24",
+              "name": "isp",
+              "value": "={{ $json.data?.isp || \"unknown\" }}",
+              "type": "string"
+            },
+            {
+              "id": "45e382b9-0bf2-424e-bc56-ed13238ac6e5",
+              "name": "usage_type",
+              "value": "={{ $json.data?.usageType || \"unknown\" }}",
+              "type": "string"
+            },
+            {
+              "id": "b029a166-cbba-4a8d-a461-04916d60dd32",
+              "name": "num_distinct_users",
+              "value": "={{ Number($json.data?.numDistinctUsers || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "0165488d-5cdf-4c7f-9536-4eeb84c7ca76",
+              "name": "last_report",
+              "value": "={{ $json.data?.lastReportedAt || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3ba97029-4e31-442f-9369-d93236dd612a",
+              "name": "total_reports",
+              "value": "={{ Number($json.data?.totalReports || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "44ea7aad-8428-46bb-ada6-aefbb4d76e89",
+              "name": "threat_intel_available",
+              "value": "={{ !!$json.data?.ipAddress && $json.data?.abuseConfidenceScore !== undefined && $json.data?.abuseConfidenceScore !== null }}",
+              "type": "boolean"
+            },
+            {
+              "id": "870f2696-943a-4ef8-9da8-0e3bc7ed9a9f",
+              "name": "rule_level",
+              "value": "={{ Number($('Normalize Wazuh Alert').item.json.rule_level || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "86a9b36f-76e1-4647-9cdd-541365af6ed4",
+              "name": "event_source",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.event_source || \"unknown\" }}",
+              "type": "string"
+            },
+            {
+              "id": "1f82a225-a5c1-446c-9915-d30d68566ee5",
+              "name": "observed_activity",
+              "value": "={{ $json.data?.input || $json.data?.command || $json.data?.eventid || $json.full_log || \"No activity available\" }}",
+              "type": "string"
+            },
+            {
+              "id": "c82d209f-5b66-42d9-8bca-8d69d69e6608",
+              "name": "summary",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.summary || $('Normalize Wazuh Alert').item.json.rule_description || \"No summary available\" }}",
+              "type": "string"
+            },
+            {
+              "id": "db9e37d4-74a1-488a-81e7-d4e3b1fb39fa",
+              "name": "rule_description",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.rule_description || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "631c4eea-3202-4a26-906e-ee25924ae63e",
+              "name": "event_type",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.event_type || \"unknown\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a137554d-427b-4e1b-82c1-4a54440fd7ac",
+              "name": "source_event_id",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.source_event_id || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "635977d8-f231-479d-9e15-3a978a78af86",
+              "name": "recommended_pipeline",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.recommended_pipeline || \"manual_review\" }}",
+              "type": "string"
+            },
+            {
+              "id": "27011adb-ef72-4580-aab7-774d17e00afd",
+              "name": "observed_activity",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.observed_activity || \"No activity available\" }}",
+              "type": "string"
+            },
+            {
+              "id": "6b5e4fdf-4fe6-42df-bb1a-d2a149a8b499",
+              "name": "agent_ip",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.agent_ip || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "e8340eab-71c5-4f01-a4e9-a48290a082c2",
+              "name": "event_image",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.event_image || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "4d6de8ad-329e-4f27-a3f9-a05f6d77b88f",
+              "name": "event_data_user",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.eventdata_user || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "74ed44d2-8846-426e-93de-f4581fe39363",
+              "name": "file_url",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.file_url || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "7bf41539-1047-4be8-aefa-1a8416fefc64",
+              "name": "file_hash",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.file_hash || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "f43d41dc-c75e-4976-b584-a293504d0efd",
+              "name": "target_file",
+              "value": "={{ $('Normalize Wazuh Alert').item.json.target_file || \"N/A\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        768,
+        -96
+      ],
+      "id": "527d80e4-b7e7-4735-b8f4-351e6808bd3a",
+      "name": "Normalize Security Context"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an AI Security Operations Analyst responsible for triaging enterprise security cases and recommending response actions according to SOC response policies.\n\nAnalyze the following security case.\n\n=====================================================================\nINCIDENT CONTEXT\n=====================================================================\n\nEvent Type:\n{{$json.event_type}}\n\nRule Description:\n{{$json.rule_description}}\n\nRule Level:\n{{$json.rule_level}}\n\nSource:\n{{$json.event_source}}\n\nObserved Activity:\n{{$json.observed_activity}}\n\nSummary:\n{{$json.summary}}\n\nSource IP:\n{{$json.source_ip}}\n\nAgent IP:\n{{$json.agent_ip}}\n\nUser:\n{{$json.event_data_user}}\n\nProcess Image:\n{{$json.event_image}}\n\nTarget File:\n{{$json.target_file}}\n\nFile URL:\n{{$json.file_url}}\n\nFile Hash:\n{{$json.file_hash}}\n\nSource Event ID:\n{{$json.source_event_id}}\n\nRecommended Pipeline:\n{{$json.recommended_pipeline}}\n\n\n=====================================================================\nTHREAT INTELLIGENCE\n=====================================================================\n\nThreat Intelligence Available:\n{{$json.threat_intel_available}}\n\nAbuse Confidence Score:\n{{$json.abuse_score}}\n\nCountry:\n{{$json.country}}\n\nISP:\n{{$json.isp}}\n\nUsage Type:\n{{$json.usage_type}}\n\nTotal Reports:\n{{$json.total_reports}}\n\nDistinct Reporters:\n{{$json.num_distinct_users}}\n\n=====================================================================\nDECISION FRAMEWORK\n=====================================================================\n\nChoose exactly ONE response policy.\n\nIgnore\n- Benign or expected activity.\n- No analyst action required.\n\nMonitor\n- Suspicious activity.\n- Low operational risk.\n- Store for future correlation.\n- No immediate analyst intervention required.\n\nEscalate\n- Confirmed or potentially malicious activity.\n- Human investigation is required.\n- Automated containment is not considered safe because additional context or analyst validation is required.\n\nContain\nChoose Contain ONLY when ALL conditions are satisfied:\n\n- Threat is confirmed malicious.\n- Source is external.\n- Automated containment is considered low risk.\n- Containment is easily reversible.\n- No production assets will be negatively affected.\n\nThreat confidence and automation safety are different concepts.\n\nA confirmed threat DOES NOT automatically justify automated containment.\n\nContainment should only be selected when the response policy allows a safe and reversible automated action.\n\nResponse decisions must prioritize operational safety over automation.\n\nWhen multiple decisions appear valid, always choose the least disruptive response that adequately mitigates the identified risk.\n\n=====================================================================\nPOLICY CONSTRAINTS\n=====================================================================\n\nIf Threat Intelligence Available is FALSE:\n\n- Never recommend firewall IP blocking.\n- Never recommend null-routing.\n- Never recommend perimeter blocking.\n- Do not recommend any response that depends on a missing source IP.\n\nInstead:\n\n- Choose Escalate if analyst investigation is required.\n- Choose Monitor when the operational impact is low.\n\nIf Source IP is:\n\n- N/A\n- Unknown\n- Empty\n- Missing\n\nContain must NOT be selected if the only containment action would be blocking the source IP.\n\n======================================================================\nHoneypot Response Policy\n======================================================================\n\nIf the event source is a honeypot and ALL of the following are true:\n\n- Source IP is available\n- Abuse Confidence Score >= 90\n- Usage Type indicates external infrastructure\n- Event represents successful attacker interaction, including:\n  - cowrie.login.success\n  - cowrie.command.input\n  - authentication_success from a honeypot\n  - command_execution from a honeypot\n\nThen automated containment SHOULD be preferred.\n\nReason:\n\nBlocking an attacker interacting exclusively with a honeypot carries negligible operational risk and is considered a safe, reversible response.\n\n=====================================================================\nDOMAIN KNOWLEDGE\n=====================================================================\n\nIf eventid equals:\n\ncowrie.login.success\n\nTreat the event as a successful authentication to the honeypot.\n\nDo NOT interpret this as a successful compromise of a production asset.\n\nA successful login to the honeypot represents confirmed attacker interaction with the deception environment and should be evaluated according to the overall context.\n\n=====================================================================\nOUTPUT REQUIREMENTS\n=====================================================================\n\nReturn ONLY valid JSON.\n\nDo not return:\n\n- Markdown\n- Code fences\n- Comments\n- Explanations\n- Any text outside the JSON\n\n=====================================================================\nALLOWED VALUES\n=====================================================================\n\nseverity\n\n- Low\n- Medium\n- High\n- Critical\n\ndecision\n\n- Ignore\n- Monitor\n- Escalate\n- Contain\n\nconfidence\n\n- Integer between 0 and 100\n\n=====================================================================\nOUTPUT SCHEMA\n=====================================================================\n\n{\n  \"severity\": \"\",\n  \"confidence\": 0,\n  \"decision\": \"\",\n  \"reason\": \"\",\n  \"mitre\": [],\n  \"recommended_actions\": [],\n  \"executive_summary\": \"\",\n  \"response_policy_reason\": \"\"\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        992,
+        -96
+      ],
+      "id": "261c10c3-87ff-4fc4-88ce-c5533e3fba37",
+      "name": "AI Case Investigation",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "function fallbackDecision(errorMessage = 'AI Decision Engine unavailable or returned invalid output.') {\n  return [\n    {\n      json: {\n        severity: 'Medium',\n        confidence: 0,\n        decision: 'Escalate',\n        reason: errorMessage,\n        mitre: ['N/A'],\n        recommended_actions: [\n          'Review the normalized security context manually',\n          'Validate threat intelligence and source IP reputation',\n          'Decide whether containment is required'\n        ],\n        executive_summary: 'The security event could not be evaluated by the AI decision engine. The case was routed to manual analysis to avoid unsafe automated action.',\n        response_policy_reason: 'Fail-safe behavior: when the AI decision engine fails or returns invalid output, the workflow defaults to manual analysis and does not execute automated containment.',\n        ai_engine_status: 'failed',\n        workflow_fallback: true\n      }\n    }\n  ];\n}\n\ntry {\n  const raw =\n    $json?.content?.parts?.[0]?.text ||\n    $json?.text ||\n    $json?.response ||\n    '';\n\n  if (!raw) {\n    const errorMessage =\n      $json?.error?.message ||\n      $json?.message ||\n      'Gemini returned no usable response. Possible quota, token, API, or model error.';\n\n    return fallbackDecision(errorMessage);\n  }\n\n  const cleaned = raw\n    .replace(/```json/g, '')\n    .replace(/```/g, '')\n    .trim();\n\n  const parsed = JSON.parse(cleaned);\n\n  const allowedDecisions = ['Ignore', 'Monitor', 'Escalate', 'Contain'];\n  const allowedSeverity = ['Low', 'Medium', 'High', 'Critical'];\n\n  if (!allowedDecisions.includes(parsed.decision)) {\n    return fallbackDecision(`Invalid AI decision returned: ${parsed.decision}`);\n  }\n\n  if (!allowedSeverity.includes(parsed.severity)) {\n    parsed.severity = 'Medium';\n  }\n\n  parsed.confidence = Number(parsed.confidence || 0);\n\n  if (!Array.isArray(parsed.recommended_actions)) {\n    parsed.recommended_actions = [\n      'Review the event manually',\n      'Validate threat intelligence',\n      'Determine appropriate response'\n    ];\n  }\n\n  if (!Array.isArray(parsed.mitre)) {\n    parsed.mitre = ['N/A'];\n  }\n\n  parsed.ai_engine_status = 'success';\n  parsed.workflow_fallback = false;\n\n  return [\n    {\n      json: parsed\n    }\n  ];\n\n} catch (error) {\n  return fallbackDecision(`Failed to parse Gemini response: ${error.message}`);\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        -96
+      ],
+      "id": "008ff515-32b3-413e-b701-6fca16094233",
+      "name": "Parse AI Decision",
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "Ignore",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "fc13f6c9-eb84-476b-b5b0-ae22a6918c1b"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Ignore"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "bbe69271-e8d2-48dc-ad59-ed5f71e48551",
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "Monitor",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Monitor"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "58bc33f7-50e5-4d19-9979-1edd324b3001",
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "Escalate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Escalate"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f5296ba0-efca-46f9-877a-1510273d9fc8",
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "Contain",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Contain"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        -128
+      ],
+      "id": "5e1132cc-c975-4c74-876e-0f3e9eba2848",
+      "name": "Response Policy Engine"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=🟠 *AI SOC Case - ESCALATE*\n\n*Severity:* {{$json.severity}}\n*Confidence:* {{$json.confidence}}%\n*Decision:* {{$json.decision}}\n\n*AI Engine Status:*\n{{ $json.ai_engine_status || 'success' }}\n\n*Workflow Fallback:*\n{{ $json.workflow_fallback === true ? 'Yes - routed to manual analysis' : 'No' }}\n\n*Reason:*\n{{$json.reason}}\n\n*Summary:*\n{{$json.executive_summary}}\n\n*Recommended Actions:*\n• {{$json.recommended_actions[0]}}\n• {{$json.recommended_actions[1]}}\n• {{$json.recommended_actions[2]}}\n\n*MITRE:*\n{{ \n($json.mitre || [])\n.map(item => {\n  if (typeof item === 'string') return `• ${item}`;\n  return `• ${item.technique_id || item.id || 'N/A'} - ${item.technique || item.name || item.description || 'N/A'}`;\n})\n.join('\\n') || '• N/A'\n}}\n\n🔎 AbuseIPDB:\nhttps://www.abuseipdb.com/check/{{ $('Normalize Security Context').item.json.source_ip }}\n\n\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1792,
+        0
+      ],
+      "id": "a7983d63-81a3-4e5e-98a3-e41c68d5bebb",
+      "name": "Notify Incident Channel"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=🔴 *AI SOC Case - CONTAIN*\n\n*Severity:* {{ $('Parse AI Decision').item.json.severity }}\n*Confidence:* {{ $('Parse AI Decision').item.json.confidence }}%\n*Decision:* {{$json.decision}}\n\n*Reason:*\n{{$json.reason}}\n\n*Summary:*\n{{ $('Parse AI Decision').item.json.executive_summary }}\n\n*Recommended Actions:*\n• {{ $('Parse AI Decision').item.json.recommended_actions[0] }}\n• {{ $('Parse AI Decision').item.json.recommended_actions[1] }}\n• {{ $('Parse AI Decision').item.json.recommended_actions[2] }}\n\n*Mitre\n{{ \n($('Parse AI Decision').item.json.mitre || [])\n.map(item => {\n  if (typeof item === 'string') return `• ${item}`;\n\n  return `• ${item.technique_id || item.id || 'N/A'} - ${item.technique || item.name || item.description || 'N/A'}`;\n})\n.join('\\n') || '• N/A'\n}}\n\n\n*Containment Status:*\n✅ {{ $json.validation }}\n\n*Action Executed:*\nTemporary source IP block applied on VPS firewall.\n\n*Method:*\n{{ $json.method }}\n\n*Duration:*\n{{ $json.duration_seconds }} seconds\n\n*Blocked IP:*\n{{ $json.source_ip }}\n\n*Access Path:*\nn8n → Tailscale → Containment API → ipset/iptables\n\n*Business Impact:*\nNo production impact. Honeypot-only environment. Reversible action.\n\n🔎 AbuseIPDB:\nhttps://www.abuseipdb.com/check/{{ $('Normalize Security Context').item.json.source_ip }}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2240,
+        96
+      ],
+      "id": "f24b8a83-4391-40c6-ac75-9cb95a5d76da",
+      "name": "Notify Containment Status"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b45267ec-4e7c-49f2-8955-4028f995dd72",
+              "name": "decision",
+              "value": "Monitor",
+              "type": "string"
+            },
+            {
+              "id": "df2f00e4-cec5-464f-9e97-ae3cb40ae05c",
+              "name": "severity",
+              "value": "Informational",
+              "type": "string"
+            },
+            {
+              "id": "daafa6a0-7a75-4264-9857-0822c8f34d76",
+              "name": "reason",
+              "value": "Wazuh rule level below AI triage threshold",
+              "type": "string"
+            },
+            {
+              "id": "c3f208c7-5ac8-4ac9-ac07-143abfea2a99",
+              "name": "workflow_result",
+              "value": "No AI triage required",
+              "type": "string"
+            },
+            {
+              "id": "18dea182-0d1c-4519-8d90-4a8a005ab53f",
+              "name": "rule_level",
+              "value": "={{ $('Receive Security Case').item.json.body.rule.level }}",
+              "type": "string"
+            },
+            {
+              "id": "5e19b2dd-4396-401b-a613-47e86ce6b225",
+              "name": "rule_id",
+              "value": "={{ $('Receive Security Case').item.json.body.rule.id }}",
+              "type": "string"
+            },
+            {
+              "id": "0bb85df0-07cd-49c7-ac28-5acc16ab1772",
+              "name": "host",
+              "value": "={{ $('Receive Security Case').item.json.body.agent.name }}",
+              "type": "string"
+            },
+            {
+              "id": "90864487-0c72-4eba-9613-350f2343390d",
+              "name": "source_ip",
+              "value": "={{ $json.body.data?.src_ip || $json.body.agent.ip }}",
+              "type": "string"
+            },
+            {
+              "id": "1fa29fa2-6410-4149-a804-ff49686fb565",
+              "name": "port",
+              "value": "={{ $json.body.data?.dst_port || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "f000f57d-4f84-4a76-8f6e-4fee613faa65",
+              "name": "message",
+              "value": "={{ $('Receive Security Case').item.json.body.full_log || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "914a1b95-df5e-4dd4-a989-c8bbf3e6be57",
+              "name": "description",
+              "value": "={{ $json.body.rule.description }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        320,
+        144
+      ],
+      "id": "51dbdfe2-f06c-4c4b-8eec-fee961be8a2d",
+      "name": "Create Informational Case"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=🔵 *AI SOC Case - INFORMATIONAL*\n\n*Decision:* Monitor\n*Severity:* Informational\n*Reason:* Wazuh rule level below AI triage threshold\n\nEvent: {{ $json.description }}\n\nHost: {{$json.host}}\n\nRule: {{$json.rule_level}}\n\nSource IP: {{ $json.source_ip }}\n\nSummary: {{$json.message}}\n\n━━━━━━━━━━━━━━━━━━━━━━\n\nResult: Stored for future correlation. No AI triage required."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        544,
+        144
+      ],
+      "id": "1d84b70d-2023-4e6e-b489-eb5817149bc6",
+      "name": "Notify Informational Channel"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a2550c65-4188-4c5e-9690-860f1ea1ae6a",
+              "leftValue": "={{ $json.source_ip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        320,
+        -96
+      ],
+      "id": "435a6bb8-45e8-4e8e-9d1b-22e661567b35",
+      "name": "Threat Intelligence Applicable?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://containment-api.example.invalid/contain/block",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "source_ip",
+              "value": "={{ String($('Normalize Security Context').item.json.source_ip).trim() }}"
+            },
+            {
+              "name": "duration_seconds",
+              "value": "86400"
+            },
+            {
+              "name": "reason",
+              "value": "AI_SOC_Gemini_Containment"
+            },
+            {
+              "name": "decision",
+              "value": "Contain"
+            },
+            {
+              "name": "event_source",
+              "value": "={{ $('Normalize Security Context').item.json.event_source }}"
+            },
+            {
+              "name": "abuse_score",
+              "value": "={{ $('Normalize Security Context').item.json.abuse_score }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1792,
+        192
+      ],
+      "id": "d48701b9-28d0-41da-b68e-2c59efae8668",
+      "name": "Execute Containment via API",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "86140f0e-d021-458f-9ab6-e3412afc8321",
+              "leftValue": "={{$json.success}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2016,
+        192
+      ],
+      "id": "90ec5a4f-1c9e-43af-9c62-defc00a11b94",
+      "name": "Containment Confirmed?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=⚪ *AI SOC Case - IGNORE*\n\n*Severity:* {{$json.severity}}\n*Confidence:* {{$json.confidence}}%\n*Decision:* {{$json.decision}}\n\n*Reason:*\n{{$json.reason}}\n\n*Result:*\nNo response action required. Case closed as informational.\n\n\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1792,
+        -384
+      ],
+      "id": "e0e0f865-3e35-46d1-b480-66ce3c7b5a99",
+      "name": "Notify Ignore Case"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=🟢 *AI SOC Case - MONITOR*\n\n*Severity:* {{$json.severity}}\n*Confidence:* {{$json.confidence}}%\n*Decision:* {{$json.decision}}\n\n*Reason:*\n{{$json.reason}}\n\n*Result:*\nCase stored for future correlation. No immediate containment required.\n\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1792,
+        -192
+      ],
+      "id": "a66003b4-63d3-49db-81d3-45447cbf2c32",
+      "name": "Notify Monitor Case"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=🟠 *AI SOC Case - MANUAL ANALYSIS REQUIRED*\n\n*Original AI Decision:* {{ $('Parse AI Decision').item.json.decision || 'Contain' }}\n*Severity:* {{ $('Parse AI Decision').item.json.severity || 'N/A' }}\n*Confidence:* {{ $('Parse AI Decision').item.json.confidence || 'N/A' }}%\n\n*Reason:*\n{{ $('Parse AI Decision').item.json.reason || 'No reason provided by AI.' }}\n\n*Summary:*\n{{ $('Parse AI Decision').item.json.executive_summary || 'No summary provided by AI.' }}\n\n*Source IP:*\n{{ $('Normalize Security Context').item.json.source_ip }}\n\n*Observed Activity:*\n{{ $('Normalize Security Context').item.json.observed_activity }}\n\n🔎 *Threat Intelligence:*\n*AbuseIPDB Score:* {{ $('Normalize Security Context').item.json.abuse_score }}\n*Country:* {{ $('Normalize Security Context').item.json.country }}\n*ISP:* {{ $('Normalize Security Context').item.json.isp }}\n*Usage Type:* {{ $('Normalize Security Context').item.json.usage_type }}\n*Total Reports:* {{ $('Normalize Security Context').item.json.total_reports }}\n\n⚠️ *Automated Containment Status:*\nContainment was attempted but not confirmed.\n\n*Validation Result:*\n{{ $('Execute Containment via API').item.json.validation || 'No validation returned' }}\n\n*Error:*\n{{ $('Execute Containment via API').item.json.error?.message || $('Execute Containment via API').item.json.message || $('Execute Containment via API').item.json.detail || 'No error details returned' }}\n\n*Recommended Manual Actions:*\n• Validate the VPS blocklist\n• Check Containment API logs\n• Confirm ipset/iptables enforcement\n• Manually block the IP if required\n\n🔎 *AbuseIPDB:*\nhttps://www.abuseipdb.com/check/{{ $('Normalize Security Context').item.json.source_ip }}\n\n\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2240,
+        288
+      ],
+      "id": "4fab0bba-2678-455e-b3ed-1918571051e0",
+      "name": "Notify Manual Analysis Required (Ban Fail)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "91df7d4e-6979-442f-9365-c9f56193143d",
+              "name": "source_ip",
+              "value": "={{ $json.body?.data?.src_ip || $json.body?.data?.srcip || $json.body?.data?.win?.eventdata?.sourceIp || $json.body?.data?.win?.eventdata?.sourceNetworkAddress || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "f2baf6be-58bd-4fb9-b9f4-9cea39cc53ec",
+              "name": "agent_ip",
+              "value": "={{ $json.body?.agent?.ip || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "cbbefcc4-eed4-41d4-94dc-fa59a66f2852",
+              "name": "rule_level",
+              "value": "={{ $json.body?.rule?.level || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "c356a2fe-4c7f-4918-8632-98842f6d4b9a",
+              "name": "event_source",
+              "value": "={{\n(() => {\n  const location = String($json.body?.location || \"\").toLowerCase();\n  const decoder = String($json.body?.decoder?.name || \"\").toLowerCase();\n  const groups = $json.body?.rule?.groups || [];\n\n  if ($json.body?.data?.eventid || location.includes(\"cowrie\")) return \"cowrie\";\n  if ($json.body?.data?.win?.system?.eventID || groups.includes(\"windows\") || groups.includes(\"sysmon\")) return \"windows\";\n  if (groups.includes(\"linux\") || decoder.includes(\"sshd\") || decoder.includes(\"sudo\")) return \"linux\";\n  if ($json.body?.agent?.name) return \"wazuh_agent\";\n\n  return \"unknown\";\n})()\n}}",
+              "type": "string"
+            },
+            {
+              "id": "205a847f-503b-414f-9183-49b2fac58157",
+              "name": "observed_activity",
+              "value": "={{ $json.body?.data?.message || $json.body?.data?.input || $json.body?.data?.command || $json.body?.data?.win?.eventdata?.commandLine || $json.body?.full_log || \"No activity available\" }}",
+              "type": "string"
+            },
+            {
+              "id": "9a6ae7db-9f82-48f6-bc77-c1d0d8450dbd",
+              "name": "rule_description",
+              "value": "={{ $json.body.rule.description }}",
+              "type": "string"
+            },
+            {
+              "id": "e48cfc81-0a65-4873-ab24-960559cd54b3",
+              "name": "summary",
+              "value": "={{ $json.body?.data?.win?.system?.message || $json.body?.rule?.description || $json.body?.full_log || \"No summary available\" }}",
+              "type": "string"
+            },
+            {
+              "id": "1998a0ef-8ea3-4df2-a2f4-7dd6d55dd90c",
+              "name": "event_type",
+              "value": "={{\n(() => {\n  const winEventId = String($json.body?.data?.win?.system?.eventID || \"\");\n  const cowrieEventId = String($json.body?.data?.eventid || \"\");\n  const description = String($json.body?.rule?.description || \"\").toLowerCase();\n  const fullLog = String($json.body?.full_log || \"\").toLowerCase();\n\n  if (cowrieEventId === \"cowrie.command.input\") return \"command_execution\";\n  if (cowrieEventId === \"cowrie.session.file_download\") return \"file_download\";\n  if (cowrieEventId === \"cowrie.session.file_upload\") return \"file_upload\";\n  if (cowrieEventId === \"cowrie.login.success\") return \"authentication_success\";\n  if (cowrieEventId === \"cowrie.login.failed\") return \"authentication_failure\";\n\n  if (winEventId === \"1\" || winEventId === \"4688\") return \"process_creation\";\n  if (winEventId === \"3\") return \"network_connection\";\n  if (winEventId === \"11\") return \"file_creation\";\n  if (winEventId === \"22\") return \"dns_query\";\n  if (winEventId === \"4624\") return \"authentication_success\";\n  if (winEventId === \"4625\") return \"authentication_failure\";\n\n  if (description.includes(\"command\") || fullLog.includes(\"command=\")) return \"command_execution\";\n  if (description.includes(\"file\") || fullLog.includes(\"sha256\") || fullLog.includes(\"shasum\")) return \"file_activity\";\n  if (description.includes(\"login\") || description.includes(\"authentication\")) return \"authentication_activity\";\n\n  return \"unknown\";\n})()\n}}",
+              "type": "string"
+            },
+            {
+              "id": "46e84b67-449f-413e-9562-7e6dbfc8e45a",
+              "name": "event_image",
+              "value": "={{ $json.body?.data?.win?.eventdata?.image || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "1a92f02b-4125-44f5-bb45-1e8da5f5a0e5",
+              "name": "eventdata_user",
+              "value": "={{ $json.body?.data?.win?.eventdata?.user || $json.body?.data?.win?.eventdata?.targetUserName || $json.body?.data?.username || $json.body?.data?.user || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "b4e1c564-e984-4d7c-9829-3075a58acc53",
+              "name": "source_event_id",
+              "value": "={{ $json.body?.data?.eventid || $json.body?.data?.win?.system?.eventID || $json.body?.rule?.id || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "f3d01370-1392-44bc-8ff2-89abfb6b7bb4",
+              "name": "file_url",
+              "value": "={{   $json.body?.data?.url || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "aef2d106-1d51-4cf7-9ef0-ace9b53e297f",
+              "name": "file_hash",
+              "value": "={{ $json.body?.data?.win?.eventdata?.hashes || $json.body?.data?.shasum || $json.body?.data?.sha256 || $json.body?.data?.hash || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "ca0ac880-8dc0-498c-a129-333eda95800f",
+              "name": "target_file",
+              "value": "={{ $json.body?.data?.win?.eventdata?.targetFilename || $json.body?.data?.filename || $json.body?.data?.outfile || $json.body?.data?.destfile || \"N/A\" }}",
+              "type": "string"
+            },
+            {
+              "id": "bda91ab5-3c48-4a7d-a535-5fc7893f3b9e",
+              "name": "recommended_pipeline",
+              "value": "={{ (() => {   const winEventId = String($json.body?.data?.win?.system?.eventID || \"\");   const cowrieEventId = String($json.body?.data?.eventid || \"\");   const description = String($json.body?.rule?.description || \"\").toLowerCase();   const fullLog = String($json.body?.full_log || \"\").toLowerCase();    if (     cowrieEventId === \"cowrie.command.input\" ||     winEventId === \"1\" ||     winEventId === \"4688\" ||     description.includes(\"command\")   ) {     return \"execution_triage\";   }    if (     cowrieEventId === \"cowrie.session.file_download\" ||     cowrieEventId === \"cowrie.session.file_upload\" ||     winEventId === \"11\" ||     description.includes(\"file\") ||     fullLog.includes(\"sha256\") ||     fullLog.includes(\"shasum\")   ) {     return \"file_malware_triage\";   }    if (     cowrieEventId === \"cowrie.login.success\" ||     cowrieEventId === \"cowrie.login.failed\" ||     winEventId === \"4624\" ||     winEventId === \"4625\" ||     description.includes(\"login\") ||     description.includes(\"authentication\")   ) {     return \"credential_activity_triage\";   }    if (     winEventId === \"3\" ||     winEventId === \"22\"   ) {     return \"network_triage\";   }    return \"manual_review\"; })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -128,
+        0
+      ],
+      "id": "69157e86-dd3a-4cbd-9b36-67ada29a414c",
+      "name": "Normalize Wazuh Alert"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Security Case": {
+      "main": [
+        [
+          {
+            "node": "Normalize Wazuh Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initial Risk Classification": {
+      "main": [
+        [
+          {
+            "node": "Threat Intelligence Applicable?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Informational Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threat Intelligence Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Normalize Security Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Security Context": {
+      "main": [
+        [
+          {
+            "node": "AI Case Investigation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Case Investigation": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Decision": {
+      "main": [
+        [
+          {
+            "node": "Response Policy Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Policy Engine": {
+      "main": [
+        [
+          {
+            "node": "Notify Ignore Case",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Monitor Case",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Incident Channel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Containment via API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Informational Case": {
+      "main": [
+        [
+          {
+            "node": "Notify Informational Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threat Intelligence Applicable?": {
+      "main": [
+        [
+          {
+            "node": "Threat Intelligence Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Security Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Containment via API": {
+      "main": [
+        [
+          {
+            "node": "Containment Confirmed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Containment Confirmed?": {
+      "main": [
+        [
+          {
+            "node": "Notify Containment Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Manual Analysis Required (Ban Fail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Wazuh Alert": {
+      "main": [
+        [
+          {
+            "node": "Initial Risk Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}
